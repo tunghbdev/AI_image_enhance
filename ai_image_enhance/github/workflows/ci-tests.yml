@@ -1,0 +1,45 @@
+name: CI - API + GUI Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-qt requests pillow openpyxl xlsxwriter
+
+      - name: Start backend
+        run: |
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+
+      - name: Run tests and export JUnit XML
+        run: |
+          mkdir -p reports
+          pytest -v tests/ --junitxml=reports/junit.xml
+
+      - name: Convert JUnit XML to Excel
+        run: |
+          python xml_to_excel.py reports/junit.xml iqe_desktop_tests.xlsx
+
+      - name: Upload test report Excel
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-excel
+          path: iqe_desktop_tests.xlsx
